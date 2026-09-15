@@ -1,0 +1,200 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  REDACTOR
+}
+
+enum ArticleStatus {
+  DETECTED
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+  UNPUBLISHED
+}
+
+model Domain {
+  id          String             @id @default(cuid())
+  code        String             @unique
+  hostname    String             @unique
+  name        String
+  description String?
+  logoUrl     String?
+  categories  Category[]
+  articles    Article[]
+  sources     FeedSource[]
+  users       UserDomainAccess[]
+  createdAt   DateTime           @default(now())
+
+  @@map("domains")
+}
+
+model User {
+  id           String             @id @default(cuid())
+  supabaseUid  String?            @unique
+  name         String
+  email        String             @unique
+  passwordHash String?
+  role         Role               @default(REDACTOR)
+  bio          String?            @db.Text
+  avatarUrl    String?
+  slug         String             @unique
+  domains      UserDomainAccess[]
+  articles     Article[]          @relation("AuthorArticles")
+  reviews      Article[]          @relation("ReviewerArticles")
+  auditLogs    AuditLog[]
+  createdAt    DateTime           @default(now())
+
+  @@map("users")
+}
+
+model UserDomainAccess {
+  userId   String
+  domainId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain   Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@id([userId, domainId])
+  @@map("user_domain_access")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  domainId    String
+  name        String
+  slug        String
+  description String?
+  domain      Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  articles    Article[]
+
+  @@unique([domainId, slug])
+  @@map("categories")
+}
+
+model Article {
+  id               String         @id @default(cuid())
+  domainId         String
+  domain           Domain         @relation(fields: [domainId], references: [id])
+  status           ArticleStatus  @default(DRAFT)
+  
+  title            String
+  slug             String
+  subheading       String?        @db.Text
+  content          String         @db.Text
+  excerpt          String?        @db.Text
+  
+  featuredImage    String?
+  featuredImageAlt String?
+  ogImage          String?
+  visualType       String?
+  
+  authorId         String
+  author           User           @relation("AuthorArticles", fields: [authorId], references: [id])
+  reviewerId       String?
+  reviewer         User?          @relation("ReviewerArticles", fields: [reviewerId], references: [id])
+  
+  categoryId       String
+  category         Category       @relation(fields: [categoryId], references: [id])
+  tags             String[]
+  
+  // Compliance & Attribution
+  sourceName       String?
+  sourceUrl        String?
+  countryRegion    String?
+  medicalDisclaimer Boolean       @default(false)
+  priceDataSource  String?
+  
+  // SEO Meta
+  seoTitle         String?
+  metaDescription  String?
+  canonicalUrl     String?
+  
+  // Scheduling & Timestamps
+  scheduledAt      DateTime?
+  publishedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  
+  versions         ArticleVersion[]
+  redirects        Redirect[]
+  analytics        ArticleAnalytics[]
+
+  @@unique([domainId, slug])
+  @@map("articles")
+}
+
+model ArticleVersion {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  title       String
+  subheading  String?
+  content     String   @db.Text
+  editedById  String
+  createdAt   DateTime @default(now())
+
+  @@map("article_versions")
+}
+
+model Redirect {
+  id        String   @id @default(cuid())
+  domainId  String
+  fromSlug  String
+  toSlug    String
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([domainId, fromSlug])
+  @@map("redirects")
+}
+
+model FeedSource {
+  id          String    @id @default(cuid())
+  domainId    String
+  domain      Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  name        String
+  url         String
+  country     String?
+  active      Boolean   @default(true)
+  lastChecked DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("feed_sources")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model ArticleAnalytics {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  event     String
+  country   String?
+  device    String?
+  createdAt DateTime @default(now())
+
+  @@map("article_analytics")
+}

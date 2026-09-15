@@ -1,0 +1,226 @@
+{
+  "name": "01_RSS_Detection_and_AI_News_Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,11,15,19 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger-node",
+      "name": "Cron 4x Daily Trigger (06:00, 11:00, 15:00, 19:00)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/feed_sources?select=*,domains(*)&active=eq.true",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_ANON_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        }
+      },
+      "id": "supabase-fetch-sources",
+      "name": "Fetch Feed Sources from Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "options": {}
+      },
+      "id": "rss-feed-parser",
+      "name": "Parse External RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/rpc/check_article_duplicate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_domain_id\": \"{{$node['Fetch Feed Sources from Supabase'].json['domainId']}}\",\n  \"p_source_url\": \"{{$json.link}}\",\n  \"p_title\": \"{{$json.title}}\"\n}",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_ANON_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        }
+      },
+      "id": "supabase-dedup-check",
+      "name": "Check Article Duplicate in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.is_duplicate}}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "filter-non-duplicate",
+      "name": "Is Original News?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres un redactor periodístico profesional para la web {{$node['Fetch Feed Sources from Supabase'].json['domains']['name']}}. Genera una noticia estructurada en JSON con: title, subheading, content (HTML con h2, h3, p, blockquote), tags, seoTitle, metaDescription. Si el dominio es Kompressox, cita fuentes médicas y añade aviso educativo. Si es Sillaris, indica fuente de precios y periodo.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Título original: {{$node['Parse External RSS Feed'].json['title']}}\\nResumen: {{$node['Parse External RSS Feed'].json['snippet']}}\\nEnlace: {{$node['Parse External RSS Feed'].json['link']}}\"\n    }\n  ]\n}",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            }
+          ]
+        }
+      },
+      "id": "llm-ai-article-generator",
+      "name": "AI LLM Article Generation Node",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1360, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/articles",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"id\": \"art_\" + Math.random().toString(36).substr(2, 9),\n  \"domainId\": \"{{$node['Fetch Feed Sources from Supabase'].json['domainId']}}\",\n  \"status\": \"IN_REVIEW\",\n  \"title\": {{$json.choices[0].message.content.title}},\n  \"slug\": {{$json.choices[0].message.content.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}},\n  \"subheading\": {{$json.choices[0].message.content.subheading}},\n  \"content\": {{$json.choices[0].message.content.content}},\n  \"seoTitle\": {{$json.choices[0].message.content.seoTitle}},\n  \"metaDescription\": {{$json.choices[0].message.content.metaDescription}},\n  \"sourceName\": \"{{$node['Fetch Feed Sources from Supabase'].json['name']}}\",\n  \"sourceUrl\": \"{{$node['Parse External RSS Feed'].json['link']}}\",\n  \"authorId\": \"user_editorial_ai\",\n  \"categoryId\": \"cat_general\"\n}",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_ANON_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        }
+      },
+      "id": "supabase-insert-draft",
+      "name": "Insert Article Draft into Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1580, 200]
+    }
+  ],
+  "connections": {
+    "Cron 4x Daily Trigger (06:00, 11:00, 15:00, 19:00)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Feed Sources from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Feed Sources from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Parse External RSS Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse External RSS Feed": {
+      "main": [
+        [
+          {
+            "node": "Check Article Duplicate in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Article Duplicate in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Is Original News?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Original News?": {
+      "main": [
+        [
+          {
+            "node": "AI LLM Article Generation Node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI LLM Article Generation Node": {
+      "main": [
+        [
+          {
+            "node": "Insert Article Draft into Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

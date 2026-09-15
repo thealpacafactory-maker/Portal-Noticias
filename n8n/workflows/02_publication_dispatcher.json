@@ -1,0 +1,126 @@
+{
+  "name": "02_Publication_Queue_Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-every-5-min",
+      "name": "Cron Poll Every 5 Minutes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/articles?status=eq.SCHEDULED&scheduledAt=lte.NOW()&select=*,domains(*)",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_ANON_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        }
+      },
+      "id": "supabase-fetch-scheduled",
+      "name": "Fetch Due Scheduled Articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/articles?id=eq.{{$json.id}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"PUBLISHED\",\n  \"publishedAt\": \"{{new Date().toISOString()}}\"\n}",
+        "options": {},
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_ANON_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "supabase-mark-published",
+      "name": "Mark Status as PUBLISHED in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://{{$node['Fetch Due Scheduled Articles'].json.domains.hostname}}/api/revalidate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"secret\": \"{{$env.REVALIDATE_SECRET}}\",\n  \"slug\": \"{{$node['Fetch Due Scheduled Articles'].json.slug}}\"\n}",
+        "options": {}
+      },
+      "id": "trigger-frontend-revalidate",
+      "name": "Trigger Cache Revalidation Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [920, 300]
+    }
+  ],
+  "connections": {
+    "Cron Poll Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Due Scheduled Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Due Scheduled Articles": {
+      "main": [
+        [
+          {
+            "node": "Mark Status as PUBLISHED in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Status as PUBLISHED in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Trigger Cache Revalidation Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
