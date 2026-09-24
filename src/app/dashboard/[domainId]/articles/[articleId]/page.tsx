@@ -18,7 +18,8 @@ import {
   Edit3,
   Check,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 
 interface ArticleData {
@@ -38,6 +39,8 @@ interface ArticleData {
   sourceUrl: string;
   createdAt: string;
   publishedAt?: string;
+  reviewerId?: string;
+  approvedBy?: string;
   domain?: {
     name: string;
     code: string;
@@ -50,14 +53,12 @@ function getDirectImageUrl(url: string): string {
   if (!url) return '';
   const trimmed = url.trim();
 
-  // Match Google Drive file ID from any link pattern
   const driveIdMatch =
     trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) ||
     trimmed.match(/drive\.google\.com\/(?:uc\?.*id=|open\?id=|thumbnail\?.*id=)([a-zA-Z0-9_-]+)/) ||
     trimmed.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
 
   if (driveIdMatch && driveIdMatch[1]) {
-    // sz=w1600 delivers high resolution 1600px image without Referer/CORS blocks
     return `https://drive.google.com/thumbnail?id=${driveIdMatch[1]}&sz=w1600`;
   }
 
@@ -74,7 +75,6 @@ function extractSearchKeywords(titleText: string, domainId: string): string {
     return 'running marathon';
   }
 
-  // Remove common stop words and punctuation
   const clean = titleText
     .replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, ' ')
     .toLowerCase();
@@ -93,6 +93,7 @@ export default function ArticleReviewPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [article, setArticle] = useState<ArticleData | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -115,7 +116,20 @@ export default function ArticleReviewPage({
 
   useEffect(() => {
     fetchArticle();
+    fetchUserSession();
   }, [params.articleId]);
+
+  async function fetchUserSession() {
+    try {
+      const res = await fetch('/api/v1/auth/me');
+      if (res.ok) {
+        const json = await res.json();
+        setCurrentUser(json.user);
+      }
+    } catch (err) {
+      console.error('Error fetching session:', err);
+    }
+  }
 
   async function fetchArticle() {
     setLoading(true);
@@ -185,9 +199,10 @@ export default function ArticleReviewPage({
         content,
         featuredImage: cleanImageUrl,
         featuredImageAlt,
-        ogImage: cleanImageUrl, // Automatically format Open Graph image
+        ogImage: cleanImageUrl,
         seoTitle,
         metaDescription,
+        approvedBy: currentUser ? currentUser.name : 'Jasmine',
       };
 
       if (newStatus) {
@@ -203,10 +218,10 @@ export default function ArticleReviewPage({
       const json = await res.json();
       if (json.success) {
         if (newStatus === 'PUBLISHED') {
-          alert('¡Noticia aprobada y publicada exitosamente!');
+          alert(`¡Noticia aprobada y publicada por ${payload.approvedBy}!`);
           router.push(`/dashboard/${params.domainId}?status=PUBLISHED`);
         } else if (newStatus === 'REJECTED') {
-          alert('Noticia rechazada.');
+          alert(`Noticia rechazada por ${payload.approvedBy}.`);
           router.push(`/dashboard/${params.domainId}?status=REJECTED`);
         } else {
           alert('Borrador guardado correctamente.');
@@ -318,7 +333,24 @@ export default function ArticleReviewPage({
         </div>
       </div>
 
-      {/* Compliance Warnings (if domain has specific rules) */}
+      {/* Audit Log / Reviewer Banner */}
+      {article.approvedBy && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center space-x-2">
+            <UserCheck className="w-4 h-4 text-blue-400" />
+            <span>
+              Revisado y Aprobado por: <strong className="text-white">{article.approvedBy}</strong>
+            </span>
+          </div>
+          {article.publishedAt && (
+            <span className="text-slate-500 font-mono">
+              Fecha de publicación: {new Date(article.publishedAt).toLocaleString('es-PE')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Compliance Warnings */}
       {isKompressox && !hasMedicalDisclaimer && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 p-4 rounded-xl flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />

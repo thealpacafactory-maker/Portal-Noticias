@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase/server';
 import { ArrowLeft, Clock, CheckCircle2, XCircle, Search, Eye, ExternalLink, Calendar, Filter } from 'lucide-react';
 import { notFound } from 'next/navigation';
+import DomainHeaderBanner from '@/components/DomainHeaderBanner';
 
 const DOMAINS_MAP: Record<string, { name: string; code: string; hostname: string }> = {
   dom_1: { name: 'Perú Running', code: 'perurunning', hostname: 'perurunning.pe' },
@@ -27,6 +28,15 @@ export default async function DomainWorkspacePage({
   if (!domainInfo) {
     notFound();
   }
+
+  // Fetch domain DB record to read autoPublishEnabled state
+  const { data: dbDomain } = await supabaseServer
+    .from('domains')
+    .select('autoPublishEnabled')
+    .eq('id', params.domainId)
+    .single();
+
+  const autoPublishEnabled = dbDomain?.autoPublishEnabled || false;
 
   const selectedStatus = searchParams.status || 'IN_REVIEW';
 
@@ -68,30 +78,12 @@ export default async function DomainWorkspacePage({
         <span className="text-slate-200 font-semibold">{domainInfo.name}</span>
       </div>
 
-      {/* Domain Header Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
-        <div>
-          <div className="flex items-center space-x-3">
-            <h1 className="text-2xl font-bold text-white">{domainInfo.name}</h1>
-            <span className="bg-slate-800 border border-slate-700 text-blue-400 text-xs px-2.5 py-0.5 rounded font-mono">
-              {params.domainId}
-            </span>
-          </div>
-          <p className="text-sm text-slate-400 mt-1 font-mono">{domainInfo.hostname}</p>
-        </div>
-
-        <div className="flex items-center space-x-2 text-xs">
-          <a
-            href={`/api/v1/public/articles?domain=${domainInfo.code}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-lg transition-colors"
-          >
-            <span>Ver API Pública REST</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-          </a>
-        </div>
-      </div>
+      {/* Domain Header Card & Auto-Publish Banner */}
+      <DomainHeaderBanner
+        domainId={params.domainId}
+        domainInfo={domainInfo}
+        initialAutoPublish={autoPublishEnabled}
+      />
 
       {/* Status Filter Tabs */}
       <div className="flex items-center space-x-2 border-b border-slate-800 pb-4 overflow-x-auto">
@@ -164,7 +156,7 @@ export default async function DomainWorkspacePage({
           </div>
           <h3 className="text-lg font-bold text-slate-200">No hay noticias en este estado</h3>
           <p className="text-slate-500 text-sm max-w-md mx-auto">
-            Cuando el flujo de n8n genere borradores para este dominio, aparecerán aquí automáticamente para tu revisión.
+            Cuando se generen borradores o utilices el botón &quot;Redactar Noticia&quot;, aparecerán aquí automáticamente.
           </p>
         </div>
       ) : (
@@ -189,6 +181,11 @@ export default async function DomainWorkspacePage({
                   {article.status === 'REJECTED' && (
                     <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
                       <XCircle className="w-3 h-3" /> Rechazada
+                    </span>
+                  )}
+                  {article.status === 'DRAFT' && (
+                    <span className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      Borrador
                     </span>
                   )}
 
