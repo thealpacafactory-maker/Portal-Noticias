@@ -27,17 +27,18 @@ enum ArticleStatus {
 }
 
 model Domain {
-  id          String             @id @default(cuid())
-  code        String             @unique
-  hostname    String             @unique
-  name        String
-  description String?
-  logoUrl     String?
-  categories  Category[]
-  articles    Article[]
-  sources     FeedSource[]
-  users       UserDomainAccess[]
-  createdAt   DateTime           @default(now())
+  id                 String             @id @default(cuid())
+  code               String             @unique
+  hostname           String             @unique
+  name               String
+  description        String?
+  logoUrl            String?
+  autoPublishEnabled Boolean            @default(false)
+  categories         Category[]
+  articles           Article[]
+  sources            FeedSource[]
+  users              UserDomainAccess[]
+  createdAt          DateTime           @default(now())
 
   @@map("domains")
 }
