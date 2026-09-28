@@ -19,16 +19,6 @@ import {
 } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 
-const DOMAINS_MAP: Record<string, { name: string; code: string; hostname: string }> = {
-  dom_1: { name: 'Perú Running', code: 'perurunning', hostname: 'perurunning.pe' },
-  dom_2: { name: 'The Merino Factory', code: 'themerinofactory', hostname: 'themerinofactory.com' },
-  dom_3: { name: 'Maratón de Arequipa', code: 'maratondearequipa', hostname: 'maratondearequipa.pe' },
-  dom_4: { name: 'Kompressox Health', code: 'kompressox', hostname: 'kompressox.com' },
-  dom_5: { name: 'Sillaris Inmobiliario', code: 'sillaris', hostname: 'sillaris.pe' },
-  dom_6: { name: 'Maratón de Lima', code: 'maratondelima', hostname: 'maratondelima.com.pe' },
-  dom_7: { name: 'Cinefonía Show', code: 'cinefoniashow', hostname: 'cinefoniashow.com' },
-};
-
 interface UnsplashPhoto {
   id: string;
   urls: { regular: string; small: string };
@@ -38,7 +28,11 @@ interface UnsplashPhoto {
 
 export default function NewArticlePage({ params }: { params: { domainId: string } }) {
   const router = useRouter();
-  const domainInfo = DOMAINS_MAP[params.domainId] || { name: 'Portal Noticias', code: 'portal', hostname: 'portal.com' };
+  const [domainInfo, setDomainInfo] = useState<{ name: string; code: string; hostname: string }>({
+    name: 'Cargando...',
+    code: 'portal',
+    hostname: 'portal.com',
+  });
 
   // Form State
   const [title, setTitle] = useState('');
@@ -55,6 +49,28 @@ export default function NewArticlePage({ params }: { params: { domainId: string 
 
   // Categories list
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch Domain Details dynamically
+  useEffect(() => {
+    async function loadDomain() {
+      try {
+        const res = await fetch(`/api/v1/admin/domains?domainId=${params.domainId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.data) {
+            setDomainInfo({
+              name: data.data.name,
+              code: data.data.code,
+              hostname: data.data.hostname,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching domain:', err);
+      }
+    }
+    loadDomain();
+  }, [params.domainId]);
   
   // Unsplash modal
   const [showUnsplashModal, setShowUnsplashModal] = useState(false);
