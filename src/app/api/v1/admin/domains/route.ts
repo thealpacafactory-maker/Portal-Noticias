@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'autoPublishEnabled debe ser un valor booleano' }, { status: 400 });
     }
 
+    // Update domain setting
     const { data, error } = await supabaseServer
       .from('domains')
       .update({ autoPublishEnabled })
@@ -62,6 +63,19 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // If auto-publish was turned ON, auto-publish any currently pending articles (IN_REVIEW) for this domain
+    if (autoPublishEnabled) {
+      await supabaseServer
+        .from('articles')
+        .update({
+          status: 'PUBLISHED',
+          publishedAt: new Date().toISOString(),
+          approvedBy: 'Sistema (Autopublicación Activada)',
+        })
+        .eq('domainId', domainId)
+        .eq('status', 'IN_REVIEW');
     }
 
     // Insert audit log

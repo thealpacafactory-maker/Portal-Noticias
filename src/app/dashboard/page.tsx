@@ -1,28 +1,39 @@
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase/server';
-import { Globe, Clock, CheckCircle2, XCircle, ArrowRight, ShieldAlert, Newspaper } from 'lucide-react';
+import { Clock, CheckCircle2, ArrowRight, Newspaper } from 'lucide-react';
 
 export const revalidate = 0; // Always fresh counts
 
-const DOMAINS_LIST = [
-  { id: 'dom_1', code: 'perurunning', hostname: 'perurunning.pe', name: 'Perú Running', category: 'Deportes / Atletismo', color: 'from-amber-500 to-orange-600' },
-  { id: 'dom_2', code: 'themerinofactory', hostname: 'themerinofactory.com', name: 'The Merino Factory', category: 'Industria Textil / Moda Sostenible', color: 'from-blue-600 to-cyan-600' },
-  { id: 'dom_3', code: 'maratondearequipa', hostname: 'maratondearequipa.pe', name: 'Maratón de Arequipa', category: 'Atletismo de Altura / Perú', color: 'from-red-600 to-rose-700' },
-  { id: 'dom_4', code: 'kompressox', hostname: 'kompressox.com', name: 'Kompressox Health', category: 'Salud Vascular & Compresión (Médico)', color: 'from-emerald-600 to-teal-600' },
-  { id: 'dom_5', code: 'sillaris', hostname: 'sillaris.pe', name: 'Sillaris Inmobiliario', category: 'Real Estate & Propiedades', color: 'from-indigo-600 to-purple-600' },
-  { id: 'dom_6', code: 'maratondelima', hostname: 'maratondelima.com.pe', name: 'Maratón de Lima', category: 'Running Urbano / Costa Verde', color: 'from-sky-500 to-blue-600' },
-  { id: 'dom_7', code: 'cinefoniashow', hostname: 'cinefoniashow.com', name: 'Cinefonía Show', category: 'Música de Cine & Bandas Sonoras', color: 'from-violet-600 to-fuchsia-600' },
+// Color gradients for domain cards
+const CARD_COLORS = [
+  'from-amber-500 to-orange-600',
+  'from-blue-600 to-cyan-600',
+  'from-red-600 to-rose-700',
+  'from-emerald-600 to-teal-600',
+  'from-indigo-600 to-purple-600',
+  'from-sky-500 to-blue-600',
+  'from-violet-600 to-fuchsia-600',
+  'from-emerald-500 to-green-600',
+  'from-amber-600 to-yellow-600',
 ];
 
 export default async function DomainHubPage() {
-  // Fetch article status counts from Supabase
-  const { data: articles, error } = await supabaseServer
+  // 1. Fetch domains dynamically from Supabase
+  const { data: dbDomains } = await supabaseServer
+    .from('domains')
+    .select('*')
+    .order('id', { ascending: true });
+
+  const domainsList = dbDomains || [];
+
+  // 2. Fetch article status counts from Supabase
+  const { data: articles } = await supabaseServer
     .from('articles')
     .select('domainId, status');
 
   const counts: Record<string, { inReview: number; published: number; rejected: number; total: number }> = {};
 
-  DOMAINS_LIST.forEach((d) => {
+  domainsList.forEach((d) => {
     counts[d.id] = { inReview: 0, published: 0, rejected: 0, total: 0 };
   });
 
@@ -49,7 +60,7 @@ export default async function DomainHubPage() {
             <span>Panel de Supervisión Multi-Marca</span>
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Gestión Editorial de las 7 Webs
+            Gestión Editorial Multi-Portal ({domainsList.length} Dominios)
           </h1>
           <p className="text-slate-400 max-w-2xl text-sm leading-relaxed">
             Selecciona cualquiera de tus dominios para revisar los borradores redactados por la IA, ajustar títulos e imágenes con Unsplash, y aprobar la publicación final en sus respectivas páginas.
@@ -72,9 +83,10 @@ export default async function DomainHubPage() {
 
       {/* Domain Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {DOMAINS_LIST.map((domain) => {
+        {domainsList.map((domain, index) => {
           const stats = counts[domain.id] || { inReview: 0, published: 0, rejected: 0, total: 0 };
           const hasPending = stats.inReview > 0;
+          const colorClass = CARD_COLORS[index % CARD_COLORS.length];
 
           return (
             <div
@@ -84,13 +96,13 @@ export default async function DomainHubPage() {
               } rounded-2xl p-6 transition-all hover:border-slate-700 hover:shadow-2xl flex flex-col justify-between group relative overflow-hidden`}
             >
               {/* Header colored bar */}
-              <div className={`h-1.5 w-full bg-gradient-to-r ${domain.color} absolute top-0 left-0 right-0`} />
+              <div className={`h-1.5 w-full bg-gradient-to-r ${colorClass} absolute top-0 left-0 right-0`} />
 
               <div className="space-y-4 pt-2">
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">
-                      {domain.category}
+                      {domain.description || domain.code}
                     </span>
                     <h2 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
                       {domain.name}

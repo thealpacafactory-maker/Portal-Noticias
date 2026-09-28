@@ -1,18 +1,8 @@
 import Link from 'next/link';
 import { supabaseServer } from '@/lib/supabase/server';
-import { ArrowLeft, Clock, CheckCircle2, XCircle, Search, Eye, ExternalLink, Calendar, Filter } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, XCircle, Eye, Calendar, Filter } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import DomainHeaderBanner from '@/components/DomainHeaderBanner';
-
-const DOMAINS_MAP: Record<string, { name: string; code: string; hostname: string }> = {
-  dom_1: { name: 'Perú Running', code: 'perurunning', hostname: 'perurunning.pe' },
-  dom_2: { name: 'The Merino Factory', code: 'themerinofactory', hostname: 'themerinofactory.com' },
-  dom_3: { name: 'Maratón de Arequipa', code: 'maratondearequipa', hostname: 'maratondearequipa.pe' },
-  dom_4: { name: 'Kompressox Health', code: 'kompressox', hostname: 'kompressox.com' },
-  dom_5: { name: 'Sillaris Inmobiliario', code: 'sillaris', hostname: 'sillaris.pe' },
-  dom_6: { name: 'Maratón de Lima', code: 'maratondelima', hostname: 'maratondelima.com.pe' },
-  dom_7: { name: 'Cinefonía Show', code: 'cinefoniashow', hostname: 'cinefoniashow.com' },
-};
 
 export const revalidate = 0;
 
@@ -23,21 +13,24 @@ export default async function DomainWorkspacePage({
   params: { domainId: string };
   searchParams: { status?: string };
 }) {
-  const domainInfo = DOMAINS_MAP[params.domainId];
-
-  if (!domainInfo) {
-    notFound();
-  }
-
-  // Fetch domain DB record to read autoPublishEnabled state
+  // Fetch domain DB record dynamically from Supabase
   const { data: dbDomain } = await supabaseServer
     .from('domains')
-    .select('autoPublishEnabled')
+    .select('*')
     .eq('id', params.domainId)
     .single();
 
-  const autoPublishEnabled = dbDomain?.autoPublishEnabled || false;
+  if (!dbDomain) {
+    notFound();
+  }
 
+  const domainInfo = {
+    name: dbDomain.name,
+    code: dbDomain.code,
+    hostname: dbDomain.hostname,
+  };
+
+  const autoPublishEnabled = dbDomain?.autoPublishEnabled || false;
   const selectedStatus = searchParams.status || 'IN_REVIEW';
 
   // Fetch articles from Supabase
@@ -51,7 +44,7 @@ export default async function DomainWorkspacePage({
     query = query.eq('status', selectedStatus);
   }
 
-  const { data: articles, error } = await query;
+  const { data: articles } = await query;
 
   // Counts for tabs
   const { data: allArticles } = await supabaseServer
