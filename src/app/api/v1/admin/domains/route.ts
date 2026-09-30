@@ -39,24 +39,34 @@ export async function GET(request: NextRequest) {
 }
 
 // PATCH /api/v1/admin/domains
-// Body: { domainId: 'dom_1', autoPublishEnabled: true }
+// Body: { domainId: 'dom_1', autoPublishEnabled?: true, projectId?: 'proj_leondelsur' }
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { domainId, autoPublishEnabled } = body;
+    const { domainId, autoPublishEnabled, projectId } = body;
 
     if (!domainId) {
       return NextResponse.json({ error: 'domainId es obligatorio' }, { status: 400 });
     }
 
-    if (typeof autoPublishEnabled !== 'boolean') {
-      return NextResponse.json({ error: 'autoPublishEnabled debe ser un valor booleano' }, { status: 400 });
+    const updatePayload: Record<string, any> = {};
+
+    if (typeof autoPublishEnabled === 'boolean') {
+      updatePayload.autoPublishEnabled = autoPublishEnabled;
+    }
+
+    if (projectId !== undefined) {
+      updatePayload.projectId = projectId === '' || projectId === null ? null : projectId;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: 'No hay campos válidos para actualizar' }, { status: 400 });
     }
 
     // Update domain setting
     const { data, error } = await supabaseServer
       .from('domains')
-      .update({ autoPublishEnabled })
+      .update(updatePayload)
       .eq('id', domainId)
       .select()
       .single();
@@ -66,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // If auto-publish was turned ON, auto-publish any currently pending articles (IN_REVIEW) for this domain
-    if (autoPublishEnabled) {
+    if (autoPublishEnabled === true) {
       await supabaseServer
         .from('articles')
         .update({
@@ -83,7 +93,7 @@ export async function PATCH(request: NextRequest) {
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: 'user_jasmine',
       action: 'DOMAIN_SETTINGS_UPDATE',
-      details: `Autopublicación ${autoPublishEnabled ? 'ACTIVADA' : 'DESACTIVADA'} para el dominio ${domainId}`,
+      details: `Configuración de dominio ${domainId} actualizada: ${JSON.stringify(updatePayload)}`,
     });
 
     return NextResponse.json({ success: true, data });

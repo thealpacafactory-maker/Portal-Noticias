@@ -33,6 +33,7 @@ model Domain {
   name               String
   description        String?
   logoUrl            String?
+  defaultImage       String?
   autoPublishEnabled Boolean            @default(false)
   categories         Category[]
   articles           Article[]
