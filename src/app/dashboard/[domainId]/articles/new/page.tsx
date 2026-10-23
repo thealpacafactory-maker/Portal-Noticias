@@ -95,29 +95,28 @@ export default function NewArticlePage({ params }: { params: { domainId: string 
     }
   }, [subheading, metaDescription]);
 
-  // Fetch Categories for this domain
+  // Fetch Categories for this domain from real API
   useEffect(() => {
     async function loadCategories() {
       try {
-        const res = await fetch(`/api/v1/public/articles?domain=${domainInfo.code}`);
+        const res = await fetch(`/api/v1/admin/categories?domainId=${params.domainId}`);
         if (res.ok) {
           const data = await res.json();
-          // Fallback categories if none found
-          setCategories([
-            { id: `cat_${params.domainId}_noticias`, name: 'Noticias General' },
-            { id: `cat_${params.domainId}_destacados`, name: 'Destacados' },
-            { id: `cat_${params.domainId}_eventos`, name: 'Eventos y Guías' },
-          ]);
+          if (data.data && data.data.length > 0) {
+            setCategories(data.data);
+            setCategoryId(data.data[0].id);
+          } else {
+            setCategories([{ id: `cat_${params.domainId}_general`, name: 'General' }]);
+            setCategoryId(`cat_${params.domainId}_general`);
+          }
         }
       } catch (err) {
-        // Defaults
-        setCategories([
-          { id: `cat_${params.domainId}_general`, name: 'General' },
-        ]);
+        setCategories([{ id: `cat_${params.domainId}_general`, name: 'General' }]);
+        setCategoryId(`cat_${params.domainId}_general`);
       }
     }
     loadCategories();
-  }, [params.domainId, domainInfo.code]);
+  }, [params.domainId]);
 
   // Search Unsplash
   const searchUnsplash = async () => {
