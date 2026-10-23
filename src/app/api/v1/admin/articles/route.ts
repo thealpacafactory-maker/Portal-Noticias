@@ -173,20 +173,56 @@ export async function POST(request: NextRequest) {
       finalFeaturedImageAlt = finalFeaturedImageAlt || autoImg.alt;
     }
 
-    // 3. Ensure Category ID exists or fetch default category for domain
+    // 3. Ensure Category ID exists in Supabase categories table to satisfy Foreign Key constraint
     let finalCategoryId = categoryId;
-    if (!finalCategoryId) {
-      const { data: categories } = await supabaseServer
+
+    if (finalCategoryId) {
+      const { data: catCheck } = await supabaseServer
+        .from('categories')
+        .select('id')
+        .eq('id', finalCategoryId)
+        .maybeSingle();
+
+      if (!catCheck) {
+        const { data: domainCats } = await supabaseServer
+          .from('categories')
+          .select('id')
+          .eq('domainId', domainId)
+          .limit(1);
+
+        if (domainCats && domainCats.length > 0) {
+          finalCategoryId = domainCats[0].id;
+        } else {
+          const defaultCatId = `cat_${domainId}_general`;
+          await supabaseServer.from('categories').upsert({
+            id: defaultCatId,
+            domainId: domainId,
+            name: 'General',
+            slug: 'general',
+            description: 'Categoría General del Portal',
+          }, { onConflict: 'id' });
+          finalCategoryId = defaultCatId;
+        }
+      }
+    } else {
+      const { data: domainCats } = await supabaseServer
         .from('categories')
         .select('id')
         .eq('domainId', domainId)
         .limit(1);
 
-      if (categories && categories.length > 0) {
-        finalCategoryId = categories[0].id;
+      if (domainCats && domainCats.length > 0) {
+        finalCategoryId = domainCats[0].id;
       } else {
-        // Fallback default category
-        finalCategoryId = `cat_${domainId}_general`;
+        const defaultCatId = `cat_${domainId}_general`;
+        await supabaseServer.from('categories').upsert({
+          id: defaultCatId,
+          domainId: domainId,
+          name: 'General',
+          slug: 'general',
+          description: 'Categoría General del Portal',
+        }, { onConflict: 'id' });
+        finalCategoryId = defaultCatId;
       }
     }
 
