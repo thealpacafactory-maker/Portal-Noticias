@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 
-export const revalidate = 60; // 1-minute SWR cache
+export const revalidate = 60; // sin efecto: la ruta es dinámica (lee request.url); ver Cache-Control abajo
 
 const DOMAIN_FALLBACK_IMAGES: Record<string, string> = {
   dom_1: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=1200&q=80',
@@ -30,6 +30,12 @@ export async function GET(request: NextRequest) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+  // Caché en la CDN de Vercel solo para respuestas 200 (contenido público).
+  // `revalidate` no aplica aquí porque la ruta lee request.url.
+  const cachedHeaders = {
+    ...headers,
+    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
   };
 
   if (!domainCode && !projectCode) {
@@ -63,7 +69,7 @@ export async function GET(request: NextRequest) {
         pagination: { total: 0, page, limit, totalPages: 0 },
         project: project || { code: projectCode, name: projectCode },
         domains: [],
-      }, { headers });
+      }, { headers: cachedHeaders });
     }
 
     let query = supabaseServer
@@ -111,7 +117,7 @@ export async function GET(request: NextRequest) {
       },
       project: project || { code: projectCode, name: projectCode },
       domains: domainList,
-    }, { headers });
+    }, { headers: cachedHeaders });
   }
 
   // 2. SINGLE DOMAIN QUERY
@@ -148,7 +154,7 @@ export async function GET(request: NextRequest) {
     article.featuredImage = article.featuredImage && article.featuredImage.trim() !== '' ? article.featuredImage : defaultImage;
     article.ogImage = article.ogImage && article.ogImage.trim() !== '' ? article.ogImage : article.featuredImage;
 
-    return NextResponse.json({ data: article }, { headers });
+    return NextResponse.json({ data: article }, { headers: cachedHeaders });
   }
 
   // List of Published Articles
@@ -200,7 +206,7 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil((count || 0) / limit),
     },
     domain,
-  }, { headers });
+  }, { headers: cachedHeaders });
 }
 
 export async function OPTIONS() {
