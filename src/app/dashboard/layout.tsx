@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutGrid, Globe, LogOut, UserCheck } from 'lucide-react';
+import { LayoutGrid, Globe, LogOut, UserCheck, Megaphone } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 
 export default function DashboardLayout({
@@ -25,13 +25,21 @@ export default function DashboardLayout({
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3">
           <Link
             href="/dashboard"
             className="flex items-center space-x-2 text-sm text-slate-300 hover:text-white px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700"
           >
             <Globe className="w-4 h-4 text-blue-400" />
-            <span>Ver 7 Dominios</span>
+            <span>Dominios</span>
+          </Link>
+
+          <Link
+            href="/dashboard/banners"
+            className="flex items-center space-x-2 text-sm font-semibold text-white px-3.5 py-2 rounded-lg bg-gradient-to-r from-guinda-700 to-rose-700 hover:from-guinda-600 hover:to-rose-600 transition-all border border-guinda-500/40 shadow-md"
+          >
+            <Megaphone className="w-4 h-4 text-rose-200" />
+            <span>Banners Publicitarios</span>
           </Link>
 
           {/* User Profile Badge & Logout */}

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Clock, CheckCircle2, ArrowRight, FolderKanban, Globe, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
+import { Clock, CheckCircle2, ArrowRight, FolderKanban, Globe, ChevronDown, ChevronUp, Minimize2, Maximize2, Megaphone } from 'lucide-react';
 
 interface Domain {
   id: string;
@@ -135,18 +135,29 @@ export default function ProjectDomainGroupView({ initialDomains, initialProjects
           </p>
         </div>
 
-        {/* Global Pending Notification Pill */}
-        {totalPending > 0 ? (
-          <div className="mt-6 inline-flex items-center space-x-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-xl text-sm font-semibold animate-pulse">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <span>Tienes <strong>{totalPending}</strong> noticia(s) pendientes de revisión editorial en el sistema.</span>
-          </div>
-        ) : (
-          <div className="mt-6 inline-flex items-center space-x-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl text-sm">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Todas las noticias están al día. No hay pendientes.</span>
-          </div>
-        )}
+        {/* Global Pending Notification Pill & Quick Banners Access */}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          {totalPending > 0 ? (
+            <div className="inline-flex items-center space-x-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-xl text-sm font-semibold animate-pulse">
+              <Clock className="w-5 h-5 text-amber-400" />
+              <span>Tienes <strong>{totalPending}</strong> noticia(s) pendientes de revisión editorial en el sistema.</span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center space-x-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl text-sm">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Todas las noticias están al día. No hay pendientes.</span>
+            </div>
+          )}
+
+          <Link
+            href="/dashboard/banners"
+            className="inline-flex items-center space-x-2 bg-gradient-to-r from-guinda-700 to-rose-700 hover:from-guinda-600 hover:to-rose-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg border border-guinda-500/40 transition-all"
+          >
+            <Megaphone className="w-4 h-4 text-rose-200" />
+            <span>Panel de Banners Publicitarios</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
 
       {/* Project Filter Toolbar */}
