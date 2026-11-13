@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, Zap, ShieldAlert, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Zap, ShieldAlert, PlusCircle, CheckCircle2, Megaphone } from 'lucide-react';
 
 interface DomainHeaderBannerProps {
   domainId: string;
@@ -71,6 +71,15 @@ export default function DomainHeaderBanner({ domainId, domainInfo, initialAutoPu
           >
             <PlusCircle className="w-4 h-4" />
             <span>Redactar Noticia</span>
+          </Link>
+
+          {/* Domain Banners Button */}
+          <Link
+            href={`/dashboard/banners?dominio=${encodeURIComponent(domainId)}`}
+            className="flex items-center space-x-2 bg-gradient-to-r from-guinda-700 to-rose-700 hover:from-guinda-600 hover:to-rose-600 text-white font-bold px-4 py-2.5 rounded-xl transition-all shadow-md"
+          >
+            <Megaphone className="w-4 h-4" />
+            <span>Banners Publicitarios</span>
           </Link>
 
           {/* Public REST API Link */}
