@@ -103,15 +103,14 @@ function NewBannerForm() {
 
   const toggleDomain = (domId: string) => {
     if (domId === 'all') {
-      setDominios(['all']);
+      setDominios((prev) => (prev.includes('all') ? [] : ['all']));
       return;
     }
     setDominios((prev) => {
       const withoutAll = prev.filter((d) => d !== 'all');
-      const next = withoutAll.includes(domId)
+      return withoutAll.includes(domId)
         ? withoutAll.filter((d) => d !== domId)
         : [...withoutAll, domId];
-      return next.length === 0 ? ['proj_leondelsur'] : next;
     });
   };
 
@@ -184,6 +183,10 @@ function NewBannerForm() {
     }
     if (!imagenUrl.trim()) {
       setErrorMsg('La creatividad principal (imagen) del banner es obligatoria.');
+      return;
+    }
+    if (dominios.length === 0) {
+      setErrorMsg('Debes seleccionar al menos un portal o dominio donde se mostrará el banner.');
       return;
     }
     if (dispositivos.length === 0) {
@@ -336,38 +339,77 @@ function NewBannerForm() {
             </div>
 
             {/* Selector de Dominios / Portales Objetivo */}
-            <div className="pt-2 border-t border-slate-800 space-y-2.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-blue-400" />
-                <span>Portales / Dominios donde se mostrará la campaña *</span>
-              </label>
+            <div className="pt-3 border-t border-slate-800 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Portales / Dominios donde se emitirá este banner *</span>
+                </label>
+
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setDominios(['proj_leondelsur'])}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  >
+                    Solo León del Sur
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDominios([])}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 transition-colors"
+                  >
+                    Limpiar selección
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleDomain('all')}
+                    className={`px-2.5 py-1 rounded-lg border font-semibold transition-colors ${
+                      dominios.includes('all')
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    }`}
+                  >
+                    Todos los Portales (Red Global)
+                  </button>
+                </div>
+              </div>
+
+              {dominios.includes('all') && (
+                <div className="bg-amber-950/40 border border-amber-500/40 text-amber-300 rounded-xl p-3 text-xs">
+                  <strong>Red Global activa:</strong> Este banner se mostrará en <strong>todos</strong> tus dominios conectados. Si solo quieres que aparezca en ciertos dominios, marca únicamente sus casillas abajo.
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
-                  { id: 'proj_leondelsur', label: 'León del Sur (leondelsur.pe)' },
-                  { id: 'all', label: 'Todos los Portales (Red Global)' },
+                  { id: 'proj_leondelsur', label: 'León del Sur', host: 'leondelsur.pe' },
                   ...customDomains.map((d) => ({
                     id: d.id,
-                    label: `${d.name} (${d.hostname})`,
+                    label: d.name,
+                    host: d.hostname,
                   })),
                 ].map((domOpt) => {
-                  const checked = dominios.includes(domOpt.id);
+                  const checked = dominios.includes('all') || dominios.includes(domOpt.id);
                   return (
                     <label
                       key={domOpt.id}
                       onClick={() => toggleDomain(domOpt.id)}
-                      className={`cursor-pointer px-3 py-2 rounded-xl border text-xs flex items-center justify-between transition-colors ${
+                      className={`cursor-pointer px-3.5 py-2.5 rounded-xl border text-xs flex items-center justify-between transition-colors ${
                         checked
-                          ? 'bg-indigo-950/60 border-indigo-500 text-white font-semibold'
+                          ? 'bg-indigo-950/60 border-indigo-500 text-white font-semibold shadow-sm'
                           : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <span className="truncate pr-2">{domOpt.label}</span>
+                      <div className="min-w-0 pr-2">
+                        <div className="truncate">{domOpt.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono truncate">{domOpt.host}</div>
+                      </div>
                       <input
                         type="checkbox"
                         readOnly
                         checked={checked}
-                        className="accent-indigo-500 shrink-0"
+                        className="accent-indigo-500 shrink-0 w-4 h-4"
                       />
                     </label>
                   );

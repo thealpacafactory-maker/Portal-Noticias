@@ -197,7 +197,10 @@ export default async function DashboardBannersListPage({ searchParams }: Banners
             }`}
           >
             <FolderKanban className="w-3.5 h-3.5 text-rose-400" />
-            <span>León del Sur (Portal Principal)</span>
+            <span>
+              León del Sur (
+              {allParsed.filter((b) => bannerMatchesDomain(b, 'proj_leondelsur')).length})
+            </span>
           </Link>
 
           {domainsList
@@ -213,19 +216,27 @@ export default async function DashboardBannersListPage({ searchParams }: Banners
                   'dom_nino',
                 ].includes(d.id)
             )
-            .map((dom) => (
-              <Link
-                key={dom.id}
-                href={buildFilterUrl({ dominio: dom.id })}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
-                  selectedDominio === dom.id
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                }`}
-              >
-                {dom.name}
-              </Link>
-            ))}
+            .map((dom) => {
+              const domCount = allParsed.filter((b) =>
+                bannerMatchesDomain(b, dom.id)
+              ).length;
+              return (
+                <Link
+                  key={dom.id}
+                  href={buildFilterUrl({ dominio: dom.id })}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    selectedDominio === dom.id
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <span>{dom.name}</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                    {domCount}
+                  </span>
+                </Link>
+              );
+            })}
         </div>
       </div>
 

@@ -37,6 +37,57 @@ export interface ParsedBannerRow {
   [key: string]: any;
 }
 
+/**
+ * Mapa bidireccional de equivalencias entre ID de dominio y código de portal.
+ * Nota importante: `proj_leondelsur` / `leondelsur` es independiente de `dom_3` (Maratón de Arequipa)
+ * y `dom_5` (Sillaris Inmobiliario) para que los banners de León del Sur NO se filtren a esas webs
+ * a menos que se seleccionen explícitamente.
+ */
+const DOMAIN_EQUIVALENTS: Record<string, string[]> = {
+  proj_leondelsur: [
+    "proj_leondelsur",
+    "leondelsur",
+    "leondelsur.pe",
+    "dom_8",
+    "dom_9",
+    "dom_10",
+    "dom_11",
+    "dom_13",
+    "dom_papa",
+    "dom_nino",
+  ],
+  leondelsur: [
+    "proj_leondelsur",
+    "leondelsur",
+    "leondelsur.pe",
+    "dom_8",
+    "dom_9",
+    "dom_10",
+    "dom_11",
+    "dom_13",
+    "dom_papa",
+    "dom_nino",
+  ],
+  dom_1: ["dom_1", "perurunning", "perurunning.pe"],
+  perurunning: ["dom_1", "perurunning", "perurunning.pe"],
+  dom_2: ["dom_2", "themerinofactory", "themerinofactory.com"],
+  themerinofactory: ["dom_2", "themerinofactory", "themerinofactory.com"],
+  dom_3: ["dom_3", "maratondearequipa", "maratondearequipa.pe"],
+  maratondearequipa: ["dom_3", "maratondearequipa", "maratondearequipa.pe"],
+  dom_4: ["dom_4", "kompressox", "kompressox.com"],
+  kompressox: ["dom_4", "kompressox", "kompressox.com"],
+  dom_5: ["dom_5", "sillaris", "sillaris.pe"],
+  sillaris: ["dom_5", "sillaris", "sillaris.pe"],
+  dom_6: ["dom_6", "maratondelima", "maratondelima.com.pe"],
+  maratondelima: ["dom_6", "maratondelima", "maratondelima.com.pe"],
+  dom_7: ["dom_7", "cinefoniashow", "cinefoniashow.com"],
+  cinefoniashow: ["dom_7", "cinefoniashow", "cinefoniashow.com"],
+  dom_12: ["dom_12", "mediasperu", "medias-peru.vercel.app"],
+  mediasperu: ["dom_12", "mediasperu", "medias-peru.vercel.app"],
+  dom_14: ["dom_14", "mediasperu_radar"],
+  mediasperu_radar: ["dom_14", "mediasperu_radar"],
+};
+
 export function normalizeDestinationUrl(rawUrl?: string | null): string | null {
   if (!rawUrl || typeof rawUrl !== "string") return null;
   let trimmed = rawUrl.trim();
@@ -81,11 +132,12 @@ export function parseBannerRow(row: Record<string, any>): ParsedBannerRow {
     }
   }
 
-  const parsedDominios = Array.isArray(row.dominios)
-    ? row.dominios
-    : Array.isArray(meta.dominios) && meta.dominios.length > 0
-    ? meta.dominios
-    : ["proj_leondelsur"];
+  const parsedDominios =
+    Array.isArray(row.dominios) && row.dominios.length > 0
+      ? row.dominios
+      : Array.isArray(meta.dominios) && meta.dominios.length > 0
+      ? meta.dominios
+      : ["proj_leondelsur"];
 
   return {
     ...row,
@@ -139,39 +191,20 @@ export function serializeBannerNotes(
 }
 
 /**
- * Checks if a banner matches a given domain/project filter.
+ * Verificación estricta de si un banner está asignado a un dominio o proyecto específico.
  */
 export function bannerMatchesDomain(
   banner: ParsedBannerRow,
-  domainFilter: string,
-  leonDelSurDomainIds: string[] = [
-    "dom_3",
-    "dom_5",
-    "dom_8",
-    "dom_9",
-    "dom_10",
-    "dom_11",
-    "dom_13",
-    "dom_papa",
-    "dom_nino",
-  ]
+  domainFilter: string
 ): boolean {
   if (!domainFilter || domainFilter === "ALL") return true;
-  const targets = Array.isArray(banner.dominios) ? banner.dominios : ["proj_leondelsur"];
-  if (targets.includes("all")) return true;
 
-  if (domainFilter === "proj_leondelsur" || domainFilter === "leondelsur") {
-    return (
-      targets.includes("proj_leondelsur") ||
-      targets.includes("leondelsur") ||
-      targets.some((t) => leonDelSurDomainIds.includes(t))
-    );
-  }
+  const cleanFilter = domainFilter.trim().toLowerCase();
+  const rawTargets = Array.isArray(banner.dominios) ? banner.dominios : ["proj_leondelsur"];
+  const normalizedTargets = rawTargets.map((t) => String(t).trim().toLowerCase());
 
-  // If filtering by a specific domain ID that belongs to León del Sur, match if banner targets proj_leondelsur or that specific domain
-  if (leonDelSurDomainIds.includes(domainFilter) && targets.includes("proj_leondelsur")) {
-    return true;
-  }
+  if (normalizedTargets.includes("all")) return true;
 
-  return targets.includes(domainFilter);
+  const filterEquivalents = DOMAIN_EQUIVALENTS[cleanFilter] || [cleanFilter];
+  return normalizedTargets.some((target) => filterEquivalents.includes(target));
 }
