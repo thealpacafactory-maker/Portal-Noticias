@@ -2,6 +2,7 @@ const META_PREFIX = "<!--AD_META:";
 const META_SUFFIX = "-->";
 
 export interface BannerExtraConfig {
+  campana_grupo_id?: string;
   dispositivos?: string[];
   paginas?: string[];
   dominios?: string[];
@@ -14,6 +15,7 @@ export interface BannerExtraConfig {
 
 export interface ParsedBannerRow {
   id: string;
+  campana_grupo_id: string;
   nombre_campana: string;
   anunciante: string;
   ubicacion: string;
@@ -139,9 +141,16 @@ export function parseBannerRow(row: Record<string, any>): ParsedBannerRow {
       ? meta.dominios
       : ["proj_leondelsur"];
 
+  const defaultGroupKey = `${(row.nombre_campana || "campana")
+    .toString()
+    .trim()
+    .toLowerCase()}__${(row.anunciante || "anunciante").toString().trim().toLowerCase()}`;
+
   return {
     ...row,
     id: row.id,
+    campana_grupo_id:
+      row.campana_grupo_id || meta.campana_grupo_id || defaultGroupKey,
     nombre_campana: row.nombre_campana || "",
     anunciante: row.anunciante || "",
     ubicacion: row.ubicacion || "top",

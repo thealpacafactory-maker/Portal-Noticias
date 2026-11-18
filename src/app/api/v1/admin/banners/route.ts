@@ -12,6 +12,117 @@ import {
 
 export const revalidate = 0;
 
+async function insertSingleBannerRecord(item: {
+  campana_grupo_id: string;
+  nombre_campana: string;
+  anunciante: string;
+  ubicacion: string;
+  imagen_url: string;
+  imagen_mobile_url?: string | null;
+  link_destino?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  activo?: boolean;
+  notas?: string | null;
+  dispositivos?: string[];
+  paginas?: string[];
+  dominios?: string[];
+  popup_delay_sec?: number;
+  popup_scroll_pct?: number;
+  popup_max_views?: number;
+}) {
+  const bannerId = `ban_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const nowIso = new Date().toISOString();
+
+  const safeDispositivos =
+    Array.isArray(item.dispositivos) && item.dispositivos.length > 0
+      ? item.dispositivos
+      : ['desktop', 'tablet', 'mobile'];
+  const safePaginas =
+    Array.isArray(item.paginas) && item.paginas.length > 0 ? item.paginas : ['all'];
+  const safeDominios =
+    Array.isArray(item.dominios) && item.dominios.length > 0
+      ? item.dominios
+      : ['proj_leondelsur'];
+  const safeDelay = Number.isFinite(Number(item.popup_delay_sec))
+    ? Number(item.popup_delay_sec)
+    : 8;
+  const safeScroll = Number.isFinite(Number(item.popup_scroll_pct))
+    ? Number(item.popup_scroll_pct)
+    : 45;
+  const safeMaxViews = Number.isFinite(Number(item.popup_max_views))
+    ? Number(item.popup_max_views)
+    : 1;
+
+  const encodedNotes = serializeBannerNotes(item.notas, {
+    campana_grupo_id: item.campana_grupo_id,
+    dispositivos: safeDispositivos,
+    paginas: safePaginas,
+    dominios: safeDominios,
+    popup_delay_sec: safeDelay,
+    popup_scroll_pct: safeScroll,
+    popup_max_views: safeMaxViews,
+    impresiones: 0,
+    clics: 0,
+  });
+
+  const baseRecord = {
+    id: bannerId,
+    nombre_campana: String(item.nombre_campana).trim(),
+    anunciante: String(item.anunciante).trim(),
+    ubicacion: String(item.ubicacion).trim(),
+    imagen_url: normalizeImageUrl(String(item.imagen_url)),
+    imagen_mobile_url: item.imagen_mobile_url
+      ? normalizeImageUrl(String(item.imagen_mobile_url))
+      : null,
+    link_destino: normalizeDestinationUrl(
+      item.link_destino ? String(item.link_destino) : null
+    ),
+    fecha_inicio: item.fecha_inicio
+      ? new Date(item.fecha_inicio).toISOString()
+      : nowIso,
+    fecha_fin: item.fecha_fin ? new Date(item.fecha_fin).toISOString() : null,
+    activo: typeof item.activo === 'boolean' ? item.activo : true,
+    notas: encodedNotes,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const extendedRecord = {
+    ...baseRecord,
+    dispositivos: safeDispositivos,
+    paginas: safePaginas,
+    dominios: safeDominios,
+    popup_delay_sec: safeDelay,
+    popup_scroll_pct: safeScroll,
+    popup_max_views: safeMaxViews,
+    impresiones: 0,
+    clics: 0,
+  };
+
+  let { data: createdBanner, error: insertError } = await supabaseServer
+    .from('banners')
+    .insert(extendedRecord)
+    .select()
+    .single();
+
+  if (insertError) {
+    const retry = await supabaseServer
+      .from('banners')
+      .insert(baseRecord)
+      .select()
+      .single();
+    createdBanner = retry.data;
+    insertError = retry.error;
+  }
+
+  if (insertError || !createdBanner) {
+    throw new Error(insertError?.message || 'Error al guardar el banner');
+  }
+
+  return parseBannerRow(createdBanner);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const bannerId = searchParams.get('bannerId');
@@ -78,6 +189,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      campana_grupo_id,
       nombre_campana,
       anunciante,
       ubicacion,
@@ -94,8 +206,74 @@ export async function POST(request: NextRequest) {
       popup_delay_sec,
       popup_scroll_pct,
       popup_max_views,
+      banners_list,
     } = body;
 
+    const groupId =
+      campana_grupo_id ||
+      `cmp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    // Modo 1: Creación de Campaña Completa (Múltiples banners de golpe)
+    if (Array.isArray(banners_list) && banners_list.length > 0) {
+      if (!nombre_campana || !anunciante) {
+        return NextResponse.json(
+          { error: 'El nombre de la campaña y el anunciante son obligatorios' },
+          { status: 400 }
+        );
+      }
+
+      const createdItems = [];
+      for (const item of banners_list) {
+        if (!item.ubicacion || !item.imagen_url) {
+          return NextResponse.json(
+            { error: 'Cada banner de la campaña debe tener ubicación e imagen principal' },
+            { status: 400 }
+          );
+        }
+
+        const created = await insertSingleBannerRecord({
+          campana_grupo_id: groupId,
+          nombre_campana,
+          anunciante,
+          ubicacion: item.ubicacion,
+          imagen_url: item.imagen_url,
+          imagen_mobile_url: item.imagen_mobile_url || null,
+          link_destino:
+            item.link_destino && String(item.link_destino).trim()
+              ? item.link_destino
+              : link_destino,
+          fecha_inicio,
+          fecha_fin,
+          activo,
+          notas: item.notas || notas,
+          dispositivos: item.dispositivos || dispositivos,
+          paginas: item.paginas || paginas,
+          dominios,
+          popup_delay_sec: item.popup_delay_sec ?? popup_delay_sec,
+          popup_scroll_pct: item.popup_scroll_pct ?? popup_scroll_pct,
+          popup_max_views: item.popup_max_views ?? popup_max_views,
+        });
+        createdItems.push(created);
+      }
+
+      try {
+        await supabaseServer.from('audit_logs').insert({
+          id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          userId: session.id,
+          action: 'CAMPAIGN_CREATE',
+          details: `Campaña completa "${nombre_campana}" (${createdItems.length} banners) creada por ${session.name}`,
+        });
+      } catch {}
+
+      revalidateTag('banners');
+      return NextResponse.json({
+        success: true,
+        count: createdItems.length,
+        data: createdItems,
+      });
+    }
+
+    // Modo 2: Creación de un solo banner
     if (!nombre_campana || !anunciante || !ubicacion || !imagen_url) {
       return NextResponse.json(
         { error: 'nombre_campana, anunciante, ubicacion e imagen_url son obligatorios' },
@@ -103,85 +281,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bannerId = `ban_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-    const nowIso = new Date().toISOString();
-
-    const safeDispositivos =
-      Array.isArray(dispositivos) && dispositivos.length > 0
-        ? dispositivos
-        : ['desktop', 'tablet', 'mobile'];
-    const safePaginas =
-      Array.isArray(paginas) && paginas.length > 0 ? paginas : ['all'];
-    const safeDominios =
-      Array.isArray(dominios) && dominios.length > 0 ? dominios : ['proj_leondelsur'];
-    const safeDelay = Number.isFinite(Number(popup_delay_sec)) ? Number(popup_delay_sec) : 8;
-    const safeScroll = Number.isFinite(Number(popup_scroll_pct)) ? Number(popup_scroll_pct) : 45;
-    const safeMaxViews = Number.isFinite(Number(popup_max_views)) ? Number(popup_max_views) : 1;
-
-    const encodedNotes = serializeBannerNotes(notas, {
-      dispositivos: safeDispositivos,
-      paginas: safePaginas,
-      dominios: safeDominios,
-      popup_delay_sec: safeDelay,
-      popup_scroll_pct: safeScroll,
-      popup_max_views: safeMaxViews,
-      impresiones: 0,
-      clics: 0,
+    const createdBanner = await insertSingleBannerRecord({
+      campana_grupo_id: groupId,
+      nombre_campana,
+      anunciante,
+      ubicacion,
+      imagen_url,
+      imagen_mobile_url,
+      link_destino,
+      fecha_inicio,
+      fecha_fin,
+      activo,
+      notas,
+      dispositivos,
+      paginas,
+      dominios,
+      popup_delay_sec,
+      popup_scroll_pct,
+      popup_max_views,
     });
 
-    const baseRecord = {
-      id: bannerId,
-      nombre_campana: String(nombre_campana).trim(),
-      anunciante: String(anunciante).trim(),
-      ubicacion: String(ubicacion).trim(),
-      imagen_url: normalizeImageUrl(String(imagen_url)),
-      imagen_mobile_url: imagen_mobile_url ? normalizeImageUrl(String(imagen_mobile_url)) : null,
-      link_destino: normalizeDestinationUrl(link_destino ? String(link_destino) : null),
-      fecha_inicio: fecha_inicio ? new Date(fecha_inicio).toISOString() : nowIso,
-      fecha_fin: fecha_fin ? new Date(fecha_fin).toISOString() : null,
-      activo: typeof activo === 'boolean' ? activo : true,
-      notas: encodedNotes,
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
-
-    const extendedRecord = {
-      ...baseRecord,
-      dispositivos: safeDispositivos,
-      paginas: safePaginas,
-      dominios: safeDominios,
-      popup_delay_sec: safeDelay,
-      popup_scroll_pct: safeScroll,
-      popup_max_views: safeMaxViews,
-      impresiones: 0,
-      clics: 0,
-    };
-
-    let { data: createdBanner, error: insertError } = await supabaseServer
-      .from('banners')
-      .insert(extendedRecord)
-      .select()
-      .single();
-
-    // Fallback automático si la tabla en Supabase aún no tiene las columnas opcionales
-    if (insertError) {
-      const retry = await supabaseServer
-        .from('banners')
-        .insert(baseRecord)
-        .select()
-        .single();
-      createdBanner = retry.data;
-      insertError = retry.error;
-    }
-
-    if (insertError || !createdBanner) {
-      return NextResponse.json(
-        { error: insertError?.message || 'Error al guardar el banner' },
-        { status: 500 }
-      );
-    }
-
-    // Registrar en audit_logs si existe el usuario
     try {
       await supabaseServer.from('audit_logs').insert({
         id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -189,12 +308,10 @@ export async function POST(request: NextRequest) {
         action: 'BANNER_CREATE',
         details: `Campaña "${nombre_campana}" (${ubicacion}) creada por ${session.name}`,
       });
-    } catch {
-      // No bloquear si audit_logs falla
-    }
+    } catch {}
 
     revalidateTag('banners');
-    return NextResponse.json({ success: true, data: parseBannerRow(createdBanner) });
+    return NextResponse.json({ success: true, data: createdBanner });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Error interno' }, { status: 500 });
   }
@@ -212,6 +329,8 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const {
       id,
+      ids,
+      campana_grupo_id,
       nombre_campana,
       anunciante,
       ubicacion,
@@ -229,6 +348,21 @@ export async function PATCH(request: NextRequest) {
       popup_scroll_pct,
       popup_max_views,
     } = body;
+
+    // Soporte para activar/pausar en lote todos los banners de una Carpeta de Campaña
+    if (Array.isArray(ids) && ids.length > 0 && typeof activo === 'boolean') {
+      const { error } = await supabaseServer
+        .from('banners')
+        .update({ activo, updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      revalidateTag('banners');
+      return NextResponse.json({ success: true, updatedCount: ids.length });
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID de banner requerido' }, { status: 400 });
@@ -269,8 +403,10 @@ export async function PATCH(request: NextRequest) {
         : currentParsed.popup_max_views ?? 1;
 
     const userNotes = notas !== undefined ? notas : currentParsed.notas;
+    const safeGroupId = campana_grupo_id || currentParsed.campana_grupo_id;
 
     const encodedNotes = serializeBannerNotes(userNotes, {
+      campana_grupo_id: safeGroupId,
       dispositivos: safeDispositivos,
       paginas: safePaginas,
       dominios: safeDominios,
@@ -354,9 +490,7 @@ export async function PATCH(request: NextRequest) {
         action: 'BANNER_UPDATE',
         details: `Campaña "${data.nombre_campana}" actualizada por ${session.name}`,
       });
-    } catch {
-      // No bloquear si audit_logs falla
-    }
+    } catch {}
 
     revalidateTag('banners');
     return NextResponse.json({ success: true, data: parseBannerRow(data) });
@@ -369,6 +503,20 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const bannerId = searchParams.get('bannerId');
+    const bannerIdsParam = searchParams.get('bannerIds');
+
+    if (bannerIdsParam) {
+      const idsList = bannerIdsParam.split(',').map((s) => s.trim()).filter(Boolean);
+      if (idsList.length === 0) {
+        return NextResponse.json({ error: 'bannerIds vacío' }, { status: 400 });
+      }
+      const { error } = await supabaseServer.from('banners').delete().in('id', idsList);
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      revalidateTag('banners');
+      return NextResponse.json({ success: true, deletedCount: idsList.length });
+    }
 
     if (!bannerId) {
       return NextResponse.json({ error: 'bannerId requerido' }, { status: 400 });
