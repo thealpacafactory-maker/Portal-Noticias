@@ -90,13 +90,72 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
+  try {
+    const body = await request.json();
+    const bannerId = String(body.bannerId || body.id || '').trim();
+    const rawType = String(body.eventType || body.type || '').trim().toLowerCase();
+
+    if (!bannerId || (rawType !== 'impression' && rawType !== 'click')) {
+      return NextResponse.json(
+        { ok: false, error: 'Parámetros bannerId y eventType (impression|click) requeridos' },
+        { status: 400, headers }
+      );
+    }
+
+    const { data: row, error: fetchErr } = await supabaseServer
+      .from('banners')
+      .select('id, impresiones, clics, notas')
+      .eq('id', bannerId)
+      .single();
+
+    if (fetchErr || !row) {
+      return NextResponse.json({ ok: false, error: 'Banner no encontrado' }, { status: 404, headers });
+    }
+
+    const parsed = parseBannerRow(row);
+    const nextImpresiones =
+      rawType === 'impression' ? (parsed.impresiones || 0) + 1 : parsed.impresiones || 0;
+    const nextClics =
+      rawType === 'click' ? (parsed.clics || 0) + 1 : parsed.clics || 0;
+
+    const { error: updateErr } = await supabaseServer
+      .from('banners')
+      .update({
+        impresiones: nextImpresiones,
+        clics: nextClics,
+      })
+      .eq('id', bannerId);
+
+    if (updateErr) {
+      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500, headers });
+    }
+
+    return NextResponse.json(
+      { ok: true, id: bannerId, impresiones: nextImpresiones, clics: nextClics },
+      { status: 200, headers }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err.message || 'Error al registrar métrica' },
+      { status: 500, headers }
+    );
+  }
+}
+
 export async function OPTIONS() {
   return NextResponse.json(
     {},
     {
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     }
