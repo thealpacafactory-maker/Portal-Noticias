@@ -180,14 +180,14 @@ export function parseBannerRow(row: Record<string, any>): ParsedBannerRow {
       typeof row.popup_max_views === "number"
         ? row.popup_max_views
         : meta.popup_max_views ?? 1,
-    impresiones:
-      typeof row.impresiones === "number"
-        ? row.impresiones
-        : meta.impresiones ?? 0,
-    clics:
-      typeof row.clics === "number"
-        ? row.clics
-        : meta.clics ?? 0,
+    impresiones: Math.max(
+      Number(row.impresiones) || 0,
+      Number(meta.impresiones) || 0
+    ),
+    clics: Math.max(
+      Number(row.clics) || 0,
+      Number(meta.clics) || 0
+    ),
   };
 }
 
