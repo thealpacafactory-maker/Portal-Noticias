@@ -148,6 +148,35 @@ export default function BannersCampaignFoldersView({
     }
   };
 
+  const handleUpdateCampaignLink = async (group: CampaignGroup) => {
+    const currentLink = group.banners[0]?.link_destino || '';
+    const newLink = window.prompt(
+      `Editar enlace de destino para los ${group.banners.length} banner(s) de la campaña "${group.nombre_campana}":\n(Nota: Cada dominio inyectará automáticamente ?utm_source=<dominio>&utm_medium=referral&utm_campaign=alianzas_2026 al hacer clic)`,
+      currentLink
+    );
+    if (newLink === null) return;
+
+    setBusyGroupKey(group.groupKey);
+    try {
+      const ids = group.banners.map((b) => b.id);
+      const res = await fetch('/api/v1/admin/banners', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, link_destino: newLink.trim() || null }),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const json = await res.json();
+        alert(json.error || 'No se pudo actualizar el enlace de la campaña');
+      }
+    } catch {
+      alert('Error de red al actualizar el enlace');
+    } finally {
+      setBusyGroupKey(null);
+    }
+  };
+
   const handleDeleteEntireCampaign = async (group: CampaignGroup) => {
     if (
       !confirm(
@@ -550,6 +579,18 @@ export default function BannersCampaignFoldersView({
                         </p>
                       </div>
                     </div>
+
+                    {/* Edit destination URL for entire campaign folder */}
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleUpdateCampaignLink(group)}
+                      title="Cambiar enlace de destino de toda la carpeta de campaña"
+                      className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Link</span>
+                    </button>
 
                     {/* Add another banner to this campaign */}
                     <Link
