@@ -113,6 +113,67 @@ export function normalizeDestinationUrl(rawUrl?: string | null): string | null {
   return `https://${trimmed.replace(/^\/+/, "")}`;
 }
 
+const DOMAIN_ID_TO_UTM_SOURCE: Record<string, string> = {
+  proj_leondelsur: "leondelsur",
+  leondelsur: "leondelsur",
+  dom_1: "perurunning",
+  perurunning: "perurunning",
+  dom_2: "themerinofactory",
+  themerinofactory: "themerinofactory",
+  dom_3: "maratondearequipa",
+  maratondearequipa: "maratondearequipa",
+  dom_4: "kompressox",
+  kompressox: "kompressox",
+  dom_5: "sillaris",
+  sillaris: "sillaris",
+  dom_6: "maratondelima",
+  maratondelima: "maratondelima",
+  dom_7: "cinefoniashow",
+  cinefoniashow: "cinefoniashow",
+  dom_12: "mediasperu",
+  mediasperu: "mediasperu",
+  dom_14: "mediasperu",
+  mediasperu_radar: "mediasperu",
+};
+
+export function buildTrackedDestinationUrl(
+  rawUrl?: string | null,
+  options?: {
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+  }
+): string | null {
+  const normalized = normalizeDestinationUrl(rawUrl);
+  if (!normalized) return null;
+
+  if (!/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  try {
+    const urlObj = new URL(normalized);
+    const rawSrc = (options?.utmSource || "leondelsur").trim().toLowerCase();
+    const source = DOMAIN_ID_TO_UTM_SOURCE[rawSrc] || rawSrc.replace(/[^a-z0-9_]/g, "") || "leondelsur";
+    const medium = options?.utmMedium || "referral";
+    const campaign = options?.utmCampaign || "alianzas_2026";
+
+    if (!urlObj.searchParams.has("utm_source")) {
+      urlObj.searchParams.set("utm_source", source);
+    }
+    if (!urlObj.searchParams.has("utm_medium")) {
+      urlObj.searchParams.set("utm_medium", medium);
+    }
+    if (!urlObj.searchParams.has("utm_campaign")) {
+      urlObj.searchParams.set("utm_campaign", campaign);
+    }
+
+    return urlObj.toString();
+  } catch {
+    return normalized;
+  }
+}
+
 /**
  * Extracts extended config from `notas` if the database doesn't have the new columns yet,
  * and merges with native columns when present.

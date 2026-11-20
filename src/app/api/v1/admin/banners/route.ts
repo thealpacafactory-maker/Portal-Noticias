@@ -349,11 +349,23 @@ export async function PATCH(request: NextRequest) {
       popup_max_views,
     } = body;
 
-    // Soporte para activar/pausar en lote todos los banners de una Carpeta de Campaña
-    if (Array.isArray(ids) && ids.length > 0 && typeof activo === 'boolean') {
+    // Soporte para activar/pausar o cambiar link_destino en lote a todos los banners de una Carpeta de Campaña
+    if (Array.isArray(ids) && ids.length > 0) {
+      const batchUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (typeof activo === 'boolean') {
+        batchUpdate.activo = activo;
+      }
+      if (link_destino !== undefined) {
+        batchUpdate.link_destino = normalizeDestinationUrl(
+          link_destino ? String(link_destino) : null
+        );
+      }
+
       const { error } = await supabaseServer
         .from('banners')
-        .update({ activo, updated_at: new Date().toISOString() })
+        .update(batchUpdate)
         .in('id', ids);
 
       if (error) {
